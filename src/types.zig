@@ -5,6 +5,7 @@ const b2 = glbs.b2;
 const glbs = @import("globals.zig");
 const funcs = @import("functions.zig");
 const Player = @import("Player.zig");
+pub const Texture = @import("resources").Texture;
 
 pub fn Vec2(comptime T: type) type {
     return struct {
@@ -12,20 +13,6 @@ pub fn Vec2(comptime T: type) type {
         y: T,
     };
 }
-
-pub const Texture = @import("resources").Texture;
-
-pub const TeamTextures = struct {
-    player_textures: PlayerTextures,
-    dynamite_textures: [2]rl.Texture2D,
-    explosion_textures: [2]rl.Texture2D,
-};
-
-pub const PlayerTextures = struct {
-    side: [3]rl.Texture2D,
-    down: [3]rl.Texture2D,
-    up: [3]rl.Texture2D,
-};
 
 pub const Team = enum {
     alpha,
@@ -49,10 +36,16 @@ pub const UpgradeUnderneath = enum {
     none,
 };
 
-pub const DynamiteState = enum {
-    idle,
-    exploding,
-    exploded,
+pub const TeamTextures = struct {
+    player_textures: PlayerTextures,
+    dynamite_textures: [2]rl.Texture2D,
+    explosion_textures: [2]rl.Texture2D,
+};
+
+pub const PlayerTextures = struct {
+    side: [3]rl.Texture2D,
+    down: [2]rl.Texture2D,
+    up: [2]rl.Texture2D,
 };
 
 pub const Wall = struct {
@@ -101,8 +94,8 @@ pub const Cell = struct {
 
     pub fn initExplosion(team: Team, variant: ExplosionVariant, upgrade_underneath: UpgradeUnderneath) @This() {
         return .{
-            .tag = if (variant == .crossed) .explosion_2 else .explosion_1,
-            .variant = .{ .explosion_1 = .{
+            .tag = if (variant == .crossed) .explosion_crossed else .explosion,
+            .variant = .{ .explosion = .{
                 .team = team,
                 .variant = variant,
                 .timer = glbs.EXPLOSION_DURATION,
@@ -113,8 +106,8 @@ pub const Cell = struct {
 
     pub fn initDynamite(team: Team, radius: u8) @This() {
         return .{
-            .tag = .dynamite_1,
-            .variant = .{ .dynamite_1 = .init(team, radius) },
+            .tag = .dynamite,
+            .variant = .{ .dynamite = .init(team, radius) },
         };
     }
 
@@ -131,37 +124,25 @@ pub const CellVariant = union {
     wall: Wall,
     death_wall: Wall,
     barrel: Barrel,
-    dynamite_1: Dynamite,
-    dynamite_2: Dynamite,
-    explosion_1: Explosion,
-    explosion_2: Explosion,
+    dynamite: Dynamite,
+    dynamite_exploding: Dynamite,
+    explosion: Explosion,
+    explosion_crossed: Explosion,
     upgrade_dynamite: void,
     upgrade_heal: void,
     upgrade_radius: void,
     upgrade_speed: void,
     upgrade_teleport: void,
-    hearth: void,
-    invincible_hearth: void,
-    player_down_1: void,
-    player_down_2: void,
-    player_down_3: void,
-    player_side_1: void,
-    player_side_2: void,
-    player_side_3: void,
-    player_up_1: void,
-    player_up_2: void,
 };
 
 pub const Dynamite = struct {
     team: Team,
-    state: DynamiteState,
     timer: f32,
     radius: u8,
 
     pub fn init(team: Team, radius: u8) @This() {
         return .{
             .team = team,
-            .state = .idle,
             .timer = glbs.EXPLOSION_DELAY,
             .radius = radius,
         };
@@ -170,14 +151,4 @@ pub const Dynamite = struct {
     pub fn update(self: *@This()) void {
         self.timer -= glbs.PHYSICS_TIMESTEP;
     }
-};
-
-pub const PlayerConfig = struct {
-    team_color: rl.Color,
-    key_bindings: std.enums.EnumArray(Player.MoveDirection, rl.KeyboardKey),
-};
-
-pub const GameSettings = struct {
-    player_count: i32 = 2,
-    player_configs: [4]PlayerConfig,
 };

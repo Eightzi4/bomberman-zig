@@ -110,7 +110,7 @@ fn fixedUpdate(self: *@This()) void {
                 };
                 const cell = &self.cell_grid[grid_pos.y][grid_pos.x];
 
-                if (cell.tag != .dynamite_1 and cell.tag != .dynamite_2) {
+                if (cell.tag != .dynamite and cell.tag != .dynamite_exploding) {
                     cell.* = .initDynamite(opt_player.key, player.explosion_radius);
                     player.dynamite_count -= 1;
                 }
@@ -326,28 +326,26 @@ fn createTeamTextures(data: *const Data) std.enums.EnumArray(types.Team, types.T
     for (std.enums.values(types.Team)[0..data.player_count]) |team| {
         const color = data.team_colors.get(team);
         const dynamite_textures = [_]rl.Texture2D{
-            applyShaderToTexture(shader, color, textures.get(.dynamite_1)),
-            applyShaderToTexture(shader, color, textures.get(.dynamite_2)),
+            applyShaderToTexture(shader, color, textures.get(.dynamite)),
+            applyShaderToTexture(shader, color, textures.get(.dynamite_exploding)),
         };
         const explosion_textures = [_]rl.Texture2D{
-            applyShaderToTexture(shader, color, textures.get(.explosion_1)),
-            applyShaderToTexture(shader, color, textures.get(.explosion_2)),
+            applyShaderToTexture(shader, color, textures.get(.explosion)),
+            applyShaderToTexture(shader, color, textures.get(.explosion_crossed)),
         };
         const player_textures = types.PlayerTextures{
             .side = .{
-                applyShaderToTexture(shader, color, textures.get(.player_side_1)),
-                applyShaderToTexture(shader, color, textures.get(.player_side_2)),
-                applyShaderToTexture(shader, color, textures.get(.player_side_3)),
+                applyShaderToTexture(shader, color, textures.get(.player_idle_side)),
+                applyShaderToTexture(shader, color, textures.get(.player_walking_side)),
+                applyShaderToTexture(shader, color, textures.get(.player_walking_side2)),
             },
             .down = .{
-                applyShaderToTexture(shader, color, textures.get(.player_down_1)),
-                applyShaderToTexture(shader, color, textures.get(.player_down_2)),
-                applyShaderToTexture(shader, color, funcs.textureFlipHorizontal(textures.get(.player_down_2))),
+                applyShaderToTexture(shader, color, textures.get(.player_idle_down)),
+                applyShaderToTexture(shader, color, textures.get(.player_walking_down)),
             },
             .up = .{
-                applyShaderToTexture(shader, color, textures.get(.player_up_1)),
-                applyShaderToTexture(shader, color, textures.get(.player_up_2)),
-                applyShaderToTexture(shader, color, funcs.textureFlipHorizontal(textures.get(.player_up_2))),
+                applyShaderToTexture(shader, color, textures.get(.player_idle_up)),
+                applyShaderToTexture(shader, color, textures.get(.player_walking_up)),
             },
         };
 
@@ -409,12 +407,12 @@ fn drawBackground(self: *@This()) void {
                 .wall, .death_wall, .barrel, .upgrade_dynamite, .upgrade_heal, .upgrade_radius, .upgrade_speed, .upgrade_teleport => {
                     texture = self.textures.get(active_tag);
                 },
-                .explosion_1, .explosion_2 => {
-                    texture = self.team_textures.get(cell.variant.explosion_1.team).explosion_textures[@intFromBool(cell.variant.explosion_1.variant == .crossed)];
-                    rotation = if (cell.variant.explosion_1.variant == .vertical) 90 else 0;
+                .explosion, .explosion_crossed => {
+                    texture = self.team_textures.get(cell.variant.explosion.team).explosion_textures[@intFromBool(cell.variant.explosion.variant == .crossed)];
+                    rotation = if (cell.variant.explosion.variant == .vertical) 90 else 0;
                 },
-                .dynamite_1, .dynamite_2 => {
-                    texture = self.team_textures.get(cell.variant.dynamite_1.team).dynamite_textures[@intFromBool(active_tag == .dynamite_2)];
+                .dynamite, .dynamite_exploding => {
+                    texture = self.team_textures.get(cell.variant.dynamite.team).dynamite_textures[@intFromBool(active_tag == .dynamite_exploding)];
                 },
                 else => unreachable,
             }
@@ -431,9 +429,9 @@ fn checkPlayerPositions(self: *@This()) void {
         const cell = &self.cell_grid[@intFromFloat(@round(pos.y / glbs.PHYSICS_UNIT))][@intFromFloat(@round(pos.x / glbs.PHYSICS_UNIT))];
 
         switch (cell.tag) {
-            .ground, .dynamite_1, .dynamite_2 => {},
-            .explosion_1, .explosion_2 => {
-                const damaging_team = cell.variant.explosion_1.team;
+            .ground, .dynamite, .dynamite_exploding => {},
+            .explosion, .explosion_crossed => {
+                const damaging_team = cell.variant.explosion.team;
 
                 if (damaging_team != opt_player.key) {
                     if (self.opt_players.getPtr(damaging_team).*) |*damaging_player| {
@@ -483,15 +481,15 @@ fn updateDynamitesAndExplosions(self: *@This()) void {
             const active_tag = cell.tag;
 
             switch (active_tag) {
-                .dynamite_2 => {
-                    if (cell.variant.dynamite_1.timer > 0) {
-                        cell.variant.dynamite_1.update();
+                .dynamite_exploding => {
+                    if (cell.variant.dynamite.timer > 0) {
+                        cell.variant.dynamite.update();
 
                         break;
                     }
 
                     for (glbs.DIRECTIONS, 0..) |dir, i| {
-                        D: for (1..cell.variant.dynamite_1.radius) |offset| {
+                        for (1..cell.variant.dynamite.radius) |offset| {
                             const grid_pos = types.Vec2(usize){
                                 .x = @intCast(@as(i32, @intCast(x)) + dir.x * @as(i32, @intCast(offset))),
                                 .y = @intCast(@as(i32, @intCast(y)) + dir.y * @as(i32, @intCast(offset))),
@@ -501,72 +499,72 @@ fn updateDynamitesAndExplosions(self: *@This()) void {
                             const cell_in_radius_active_tag = cell_in_radius.tag;
 
                             switch (cell_in_radius_active_tag) {
-                                .wall, .death_wall, .explosion_2 => break,
+                                .wall, .death_wall, .explosion_crossed => break,
                                 .ground => {
                                     cell_in_radius.* = .initExplosion(
-                                        cell.variant.dynamite_1.team,
-                                        O: {
+                                        cell.variant.dynamite.team,
+                                        D: {
                                             const variant: types.ExplosionVariant = if (i < 2) .horizontal else .vertical;
 
-                                            if (cell_in_radius_active_tag == .explosion_1 and cell_in_radius.variant.explosion_1.team == cell.variant.dynamite_1.team and cell_in_radius.variant.explosion_1.variant != variant)
-                                                break :O .crossed;
+                                            if (cell_in_radius_active_tag == .explosion and cell_in_radius.variant.explosion.team == cell.variant.dynamite.team and cell_in_radius.variant.explosion.variant != variant)
+                                                break :D .crossed;
 
-                                            break :O variant;
+                                            break :D variant;
                                         },
                                         .none,
                                     );
                                 },
-                                .explosion_1 => {
+                                .explosion => {
                                     cell_in_radius.* = .initExplosion(
-                                        cell.variant.dynamite_1.team,
-                                        O: {
+                                        cell.variant.dynamite.team,
+                                        D: {
                                             const variant: types.ExplosionVariant = if (i < 2) .horizontal else .vertical;
 
-                                            if (cell_in_radius_active_tag == .explosion_1 and cell_in_radius.variant.explosion_1.team == cell.variant.dynamite_1.team and cell_in_radius.variant.explosion_1.variant != variant)
-                                                break :O .crossed;
+                                            if (cell_in_radius_active_tag == .explosion and cell_in_radius.variant.explosion.team == cell.variant.dynamite.team and cell_in_radius.variant.explosion.variant != variant)
+                                                break :D .crossed;
 
-                                            break :O variant;
+                                            break :D variant;
                                         },
-                                        cell_in_radius.variant.explosion_1.upgrade_underneath,
+                                        cell_in_radius.variant.explosion.upgrade_underneath,
                                     );
                                 },
                                 .barrel => {
-                                    if (self.opt_players.getPtr(cell.variant.dynamite_1.team).*) |*player| player.score += 5;
+                                    if (self.opt_players.getPtr(cell.variant.dynamite.team).*) |*player| player.score += 5;
 
                                     b2.b2DestroyBody(cell_in_radius.variant.barrel.body_id);
 
                                     var random = self.data.prng.random();
 
                                     cell_in_radius.* = .initExplosion(
-                                        cell.variant.dynamite_1.team,
-                                        O: {
+                                        cell.variant.dynamite.team,
+                                        D: {
                                             const variant: types.ExplosionVariant = if (i < 2) .horizontal else .vertical;
 
-                                            if (cell_in_radius_active_tag == .explosion_1 and cell_in_radius.variant.explosion_1.team == cell.variant.dynamite_1.team and cell_in_radius.variant.explosion_1.variant != variant)
-                                                break :O .crossed;
+                                            if (cell_in_radius_active_tag == .explosion and cell_in_radius.variant.explosion.team == cell.variant.dynamite.team and cell_in_radius.variant.explosion.variant != variant)
+                                                break :D .crossed;
 
-                                            break :O variant;
+                                            break :D variant;
                                         },
                                         if (random.boolean()) random.enumValue(types.UpgradeUnderneath) else .none,
                                     );
 
-                                    break :D;
+                                    break;
                                 },
-                                .dynamite_1, .dynamite_2 => {
-                                    cell_in_radius.variant.dynamite_1.timer = 0;
+                                .dynamite, .dynamite_exploding => {
+                                    cell_in_radius.variant.dynamite.timer = 0;
 
                                     break;
                                 },
                                 .upgrade_dynamite, .upgrade_heal, .upgrade_radius, .upgrade_speed, .upgrade_teleport => {
                                     cell_in_radius.* = .initExplosion(
-                                        cell.variant.dynamite_1.team,
-                                        O: {
+                                        cell.variant.dynamite.team,
+                                        D: {
                                             const variant: types.ExplosionVariant = if (i < 2) .horizontal else .vertical;
 
-                                            if (cell_in_radius_active_tag == .explosion_1 and cell_in_radius.variant.explosion_1.team == cell.variant.dynamite_1.team and cell_in_radius.variant.explosion_1.variant != variant)
-                                                break :O .crossed;
+                                            if (cell_in_radius_active_tag == .explosion and cell_in_radius.variant.explosion.team == cell.variant.dynamite.team and cell_in_radius.variant.explosion.variant != variant)
+                                                break :D .crossed;
 
-                                            break :O variant;
+                                            break :D variant;
                                         },
                                         @enumFromInt(@intFromEnum(cell_in_radius_active_tag) - @intFromEnum(types.Texture.upgrade_dynamite)),
                                     );
@@ -576,14 +574,14 @@ fn updateDynamitesAndExplosions(self: *@This()) void {
                         }
                     }
 
-                    if (self.opt_players.getPtr(cell.variant.dynamite_1.team).*) |*player| player.dynamite_count += 1;
+                    if (self.opt_players.getPtr(cell.variant.dynamite.team).*) |*player| player.dynamite_count += 1;
 
-                    cell.* = .initExplosion(cell.variant.dynamite_1.team, .crossed, .none);
+                    cell.* = .initExplosion(cell.variant.dynamite.team, .crossed, .none);
                 },
-                .dynamite_1 => {
-                    cell.variant.dynamite_1.update();
+                .dynamite => {
+                    cell.variant.dynamite.update();
 
-                    if (cell.variant.dynamite_1.timer < 1) cell.tag = .dynamite_2;
+                    if (cell.variant.dynamite.timer < 1) cell.tag = .dynamite_exploding;
                 },
                 else => continue,
             }
@@ -596,12 +594,12 @@ fn decayExplosions(self: *@This()) void {
         for (0..glbs.GRID_SIZE.x) |x| {
             var cell = &self.cell_grid[y][x];
 
-            if (cell.tag == .explosion_1 or cell.tag == .explosion_2) {
-                cell.variant.explosion_1.timer -= glbs.PHYSICS_TIMESTEP;
+            if (cell.tag == .explosion or cell.tag == .explosion_crossed) {
+                cell.variant.explosion.timer -= glbs.PHYSICS_TIMESTEP;
 
-                if (cell.variant.explosion_1.timer < 0) {
-                    cell.* = if (cell.variant.explosion_1.upgrade_underneath != .none)
-                        .initUpgrade(cell.variant.explosion_1.upgrade_underneath)
+                if (cell.variant.explosion.timer < 0) {
+                    cell.* = if (cell.variant.explosion.upgrade_underneath != .none)
+                        .initUpgrade(cell.variant.explosion.upgrade_underneath)
                     else
                         .initGround();
                 }

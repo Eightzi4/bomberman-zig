@@ -137,15 +137,35 @@ pub fn draw(self: *@This(), alpha: f32, cell_size: f32) void {
         .y = (self.old_position.y * (1 - alpha) + body_pos.y * alpha),
     }, cell_size);
 
-    const correct_dir_textures = switch (self.facing_direction) {
-        .up => &self.textures.up,
-        .down => &self.textures.down,
-        else => &self.textures.side,
-    };
+    var texture_to_draw: rl.Texture2D = undefined;
+    var flip_horizontally: bool = false;
 
-    const texture = if (!self.is_moving) correct_dir_textures[0] else correct_dir_textures[@intFromFloat(self.animation_timer * correct_dir_textures.len)];
+    if (!self.is_moving) {
+        texture_to_draw = switch (self.facing_direction) {
+            .up => self.textures.up[0],
+            .down => self.textures.down[0],
+            else => self.textures.side[0],
+        };
+        flip_horizontally = (self.facing_direction == .right);
+    } else {
+        const animation_step = @as(u2, @intFromFloat(self.animation_timer * 4));
 
-    funcs.drawTexturePos(texture, cell_size, pos, 0, self.facing_direction == .right);
+        switch (self.facing_direction) {
+            .left, .right => {
+                texture_to_draw = self.textures.side[glbs.PLAYER_ANIMATION_SEQUENCE[animation_step]];
+                flip_horizontally = (self.facing_direction == .right);
+            },
+            .up, .down => {
+                const texture_array = if (self.facing_direction == .up) self.textures.up else self.textures.down;
+
+                texture_to_draw = texture_array[if (animation_step % 2 == 1) 0 else 1];
+
+                flip_horizontally = animation_step == 2;
+            },
+        }
+    }
+
+    funcs.drawTexturePos(texture_to_draw, cell_size, pos, 0, flip_horizontally);
 }
 
 pub fn hurt(self: *@This()) void {
@@ -171,18 +191,16 @@ fn handleMovement(body_id: b2.b2BodyId, speed: f32, movement_actions: std.enums.
         const grid_position_x = @divFloor(position.x, glbs.PHYSICS_UNIT);
         const offset = position.x - grid_position_x * glbs.PHYSICS_UNIT;
 
-        if (@rem(grid_position_x, 2) == 0)
-            input_vector.x = if (offset < 0) -1 else 1
-        else
-            input_vector.x = if (offset < -glbs.PHYSICS_UNIT / 5) 1 else if (offset > glbs.PHYSICS_UNIT / 5) -1 else 0;
+        input_vector.x = if (@rem(grid_position_x, 2) == 0)
+            if (offset < 0) -1 else 1
+        else if (offset < -glbs.PHYSICS_UNIT / 5) 1 else if (offset > glbs.PHYSICS_UNIT / 5) -1 else 0;
     } else if (input_vector.y == 0 and input_vector.x != 0) {
         const grid_position_y = @divFloor(position.y, glbs.PHYSICS_UNIT);
         const offset = position.y - grid_position_y * glbs.PHYSICS_UNIT;
 
-        if (@rem(grid_position_y, 2) == 0)
-            input_vector.y = if (offset < 0) -1 else 1
-        else
-            input_vector.y = if (offset < -glbs.PHYSICS_UNIT / 5) 1 else if (offset > glbs.PHYSICS_UNIT / 5) -1 else 0;
+        input_vector.y = if (@rem(grid_position_y, 2) == 0)
+            if (offset < 0) -1 else 1
+        else if (offset < -glbs.PHYSICS_UNIT / 5) 1 else if (offset > glbs.PHYSICS_UNIT / 5) -1 else 0;
     }
 
     b2.b2Body_SetLinearVelocity(body_id, b2.b2MulSV(speed, input_vector));

@@ -77,13 +77,3 @@ pub fn createCollider(world_id: b2.b2WorldId, coords: types.Vec2(u8)) b2.b2BodyI
 
     return body_id;
 }
-
-pub fn textureFlipHorizontal(texture: rl.Texture2D) rl.Texture2D {
-    defer rl.unloadTexture(texture);
-    var img = rl.loadImageFromTexture(texture) catch @panic("Failed to load image from texture!");
-    defer rl.unloadImage(img);
-
-    img.flipHorizontal();
-
-    return rl.loadTextureFromImage(img) catch @panic("Failed to load texture from image!");
-}

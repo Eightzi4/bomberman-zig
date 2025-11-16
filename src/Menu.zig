@@ -17,19 +17,22 @@ const RebindInfo = struct {
     action: RebindableAction,
 };
 
-play_game: bool,
-exit_game: bool,
+const State = enum {
+    menu,
+    game,
+    settings,
+    exit,
+};
+
+state: State,
 data: *Data,
-show_settings_window: bool,
 opt_rebinding_key: ?RebindInfo,
 scroll_panel_offset: rl.Vector2,
 
 pub fn init(data_ptr: *Data) @This() {
     return .{
-        .play_game = false,
-        .exit_game = false,
+        .state = .menu,
         .data = data_ptr,
-        .show_settings_window = false,
         .opt_rebinding_key = null,
         .scroll_panel_offset = .{ .x = 0, .y = 0 },
     };
@@ -70,8 +73,8 @@ pub fn draw(self: *@This()) void {
         .black,
     );
 
-    if (self.show_settings_window) rg.lock();
-    defer if (self.show_settings_window) self.drawSettingsWindow();
+    if (self.state == .settings) rg.lock();
+    defer if (self.state == .settings) self.drawSettingsWindow();
 
     const screen_height = @as(f32, @floatFromInt(rl.getScreenHeight()));
     const button_width = 250;
@@ -79,9 +82,14 @@ pub fn draw(self: *@This()) void {
     const button_x = @divTrunc(@as(f32, @floatFromInt(screen_width)) - button_width, 2);
     const padding_y = 70;
 
-    self.play_game = rg.button(.{ .x = button_x, .y = screen_height * 0.3, .width = button_width, .height = button_height }, "Play");
-    self.show_settings_window = self.show_settings_window or rg.button(.{ .x = button_x, .y = screen_height * 0.3 + padding_y, .width = button_width, .height = button_height }, "Settings");
-    self.exit_game = rg.button(.{ .x = button_x, .y = screen_height * 0.3 + padding_y * 2, .width = button_width, .height = button_height }, "Exit");
+    self.state = if (rg.button(.{ .x = button_x, .y = screen_height * 0.3, .width = button_width, .height = button_height }, "Play"))
+        .game
+    else if (self.state == .settings or rg.button(.{ .x = button_x, .y = screen_height * 0.3 + padding_y, .width = button_width, .height = button_height }, "Settings"))
+        .settings
+    else if (rg.button(.{ .x = button_x, .y = screen_height * 0.3 + padding_y * 2, .width = button_width, .height = button_height }, "Exit"))
+        .exit
+    else
+        .menu;
 
     rg.unlock();
 }
@@ -130,7 +138,7 @@ fn drawSettingsWindow(self: *@This()) void {
     const window_bounds = rl.Rectangle{ .x = window_x, .y = window_y, .width = window_width, .height = window_height };
 
     if (rg.windowBox(window_bounds, "Settings") != 0) {
-        self.show_settings_window = false;
+        self.state = .menu;
         self.opt_rebinding_key = null;
     }
 

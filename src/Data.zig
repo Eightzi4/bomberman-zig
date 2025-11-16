@@ -8,7 +8,6 @@ const Player = @import("Player.zig");
 const Menu = @import("Menu.zig");
 
 pub const State = enum {
-    initialization,
     menu,
     game,
     quit,
@@ -29,7 +28,7 @@ pub fn init() @This() {
             std.posix.getrandom(std.mem.asBytes(&seed)) catch @panic("Failed to get random seed!");
             break :D std.Random.DefaultPrng.init(seed);
         },
-        .state = .initialization,
+        .state = .menu,
         .team_colors = D: {
             const default_colors = std.enums.EnumFieldStruct(types.Team, rl.Color, null){
                 .alpha = .blue,
@@ -100,7 +99,6 @@ pub fn update(self: *@This()) void {
 pub fn run(self: *@This()) void {
     while (!rl.windowShouldClose()) {
         self.state = switch (self.state) {
-            .initialization => .menu,
             .menu => self.runMenu(),
             .game => self.runGame(),
             .quit => return,
@@ -111,9 +109,8 @@ pub fn run(self: *@This()) void {
 pub fn runMenu(data: *@This()) State {
     var menu = Menu.init(data);
 
-    while (!rl.windowShouldClose()) {
-        if (menu.exit_game) return .quit;
-        if (menu.play_game) return .game;
+    while (!rl.windowShouldClose() and menu.state != .exit) {
+        if (menu.state == .game) return .game;
 
         data.update();
         menu.update();
