@@ -1,4 +1,4 @@
-# Bomber Man Zig
+# Bomberman Zig
 
 A classic Bomberman-style arena game built in the Zig programming language. This project is a demonstration of creating a lightweight, performant, and entirely self-contained game using modern, low-level programming.
 
