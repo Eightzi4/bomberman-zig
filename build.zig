@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const SHOULD_LEAK = true;
+const SHOULD_LEAK = false;
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -13,7 +13,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "Bomber Man Zig",
+        .name = "Bomberman Zig",
         .root_module = exe_mod,
     });
 
@@ -97,7 +97,7 @@ pub fn build(b: *std.Build) void {
 
             break :D file_names.toOwnedSlice(alloc) catch @panic("Failed to allocate file list!");
         };
-        defer if (SHOULD_LEAK) {
+        defer if (!SHOULD_LEAK) {
             for (files) |file| b.allocator.free(file);
             b.allocator.free(files);
         };

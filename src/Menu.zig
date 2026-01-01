@@ -60,8 +60,8 @@ pub fn draw(self: *@This()) void {
     defer rl.endDrawing();
     self.drawBackground();
 
-    const title_text = "Bomber Man Zig";
-    const title_font_size: i32 = 60;
+    const title_text = "Bomberman Zig";
+    const title_font_size = 60;
     const screen_width = rl.getScreenWidth();
     const title_width = rl.measureText(title_text, title_font_size);
 

@@ -1,7 +1,7 @@
 .{
-    .name = .BomberManZig,
+    .name = .BombermanZig,
     .version = "0.1.0",
-    .fingerprint = 0x1b7e8ccd15ba60b9,
+    .fingerprint = 0x1cd289fb04bdd142,
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .raylib_zig = .{
